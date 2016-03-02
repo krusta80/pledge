@@ -4,14 +4,16 @@ Promises Workshop: build the pledge.js deferral-style promise library
 ----------------------------------------------------------------*/
 // YOUR CODE HERE:
 function $Promise(){
-  this.state = 'pending';
-  this.value;
-  this.handlerGroups = [];
-  // this.pointer = -1;
+    this.state = 'pending';
+    this.value = undefined;
+    this.handlerGroups = [];
 }
 
 function Deferral(){
-  this.$promise = new $Promise();
+  if(arguments.length > 0)
+    this.$promise = arguments[0];
+  else
+    this.$promise = new $Promise();
 }
 
 function defer(){
@@ -22,11 +24,8 @@ Deferral.prototype.resolve = function(data){
   if (this.$promise.state === 'pending'){
     this.$promise.state = 'resolved';
     this.$promise.value = data;
-    // this.$promise.pointer++;
     this.$promise.callHandlers();
-  } else {
-
-  }
+  } 
 };
 
 Deferral.prototype.reject = function(reason){
@@ -34,9 +33,7 @@ Deferral.prototype.reject = function(reason){
     this.$promise.state = 'rejected';
     this.$promise.value = reason;
     this.$promise.callHandlers();
-  } else {
-
-  }
+  } 
 }
 
 $Promise.prototype.then = function(sCB, eCB){
@@ -48,6 +45,7 @@ $Promise.prototype.then = function(sCB, eCB){
   }
   var callbacks = {successCb: sCB, errorCb: eCB, forwarder: new Deferral()};
   this.handlerGroups.push(callbacks);
+
   if (sCB !== null)
     this.newest(callbacks);
   else
@@ -58,32 +56,67 @@ $Promise.prototype.then = function(sCB, eCB){
 $Promise.prototype.callHandlers = function(){
   while (this.handlerGroups.length > 0 && this.state !== 'pending'){
     var callbacks = this.handlerGroups.shift();
-      if (this.state === 'resolved') {
-        this.newest(callbacks);
-        //if(callback.forwarder) callback.forwarder.$promise.resolve(this.value);
-      }
-      else {
-        this.nError(callbacks);
-        //if(callback.forwarder) callback.forwarder.$promise.reject(this.value);
-      }
+    if (this.state === 'resolved') {
+      this.newest(callbacks);
+    }
+    else {
+      this.nError(callbacks);
+      //this.state = 'resolved';
+    }  
   }
 }
 
 $Promise.prototype.newest = function(callbacks){
   if (this.state === 'resolved') {
-      if (typeof callbacks.successCb === 'function')
-        callbacks.successCb(this.value);
+      //console.log(" in  <- "+this.value);
+      //console.log(" successCb : "+callbacks.successCb);
+      if (typeof callbacks.successCb === 'function') {
+          try {
+            var tmp = callbacks.successCb(this.value);
+            if(tmp !== undefined) {
+              if(tmp instanceof $Promise) {
+                callbacks.forwarder = new Deferral(tmp);
+                this.state = tmp.state;
+                return;
+              }
+              else 
+                this.value = tmp;    
+            }
+          }
+          catch(err) {
+            this.value = err;
+            this.state = 'rejected';
+            this.nError(callbacks);
+            return;
+          }
+      }
+      //console.log(" post call -> "+this.value);
       callbacks.forwarder.resolve(this.value);
   }
 }
 
-$Promise.prototype.nError = function(promise){
-  if ((this.state === 'rejected') && (typeof promise.errorCb === 'function'))
-   promise.errorCb(this.value);
+$Promise.prototype.nError = function(callbacks){
+  if (this.state === 'rejected') {
+      if (typeof callbacks.errorCb === 'function') {
+        try {
+          var tmp = callbacks.errorCb(this.value);
+          if(tmp !== undefined) this.value = tmp;
+          callbacks.forwarder.resolve(this.value);
+        }
+        catch(err) {
+            this.value = err;
+            this.state = 'rejected';
+            callbacks.forwarder.reject(this.value);
+            return;
+          }
+      }
+      else
+        callbacks.forwarder.reject(this.value);
+  }
 }
 
 $Promise.prototype.catch = function(func){
-  return this.then(null, func);
+    return this.then(null, func);
 }
 
 

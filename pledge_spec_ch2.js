@@ -99,11 +99,8 @@ describe('A promise', function(){
     });
 
     it('calls each success handler once per attachment', function(){
-      console.log('102');
       promiseForNum.then( fn.setFoo10 );
-      console.log('105');
       promiseForNum.then( fn.addToFoo );
-      console.log('107');
       promiseForNum.then( fn.addToFoo );
       expect( fn.setFoo10.calls.count() ).toBe( 1 );
       expect( fn.addToFoo.calls.count() ).toBe( 2 );
