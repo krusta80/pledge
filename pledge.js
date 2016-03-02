@@ -46,35 +46,35 @@ $Promise.prototype.then = function(sCB, eCB){
   if (typeof eCB !== 'function'){
     eCB = undefined;
   }
-  var callbacks = {successCb: sCB, errorCb: eCB};
+  var callbacks = {successCb: sCB, errorCb: eCB, forwarder: new Deferral()};
   this.handlerGroups.push(callbacks);
   if (sCB !== null)
     this.newest(callbacks);
   else
     this.nError(callbacks);
+  return callbacks.forwarder.$promise;
 }
 
 $Promise.prototype.callHandlers = function(){
-  // this.handlerGroups[this.handlerGroups.length-1].successCb(this.value);
-  // for (var i = 0; i < this.handlerGroups.length; i++){
-  //   if (this.state === 'resolved')
-  //     this.newest(i);
-  //   else
-  //     this.nError(i);
-  // }
   while (this.handlerGroups.length > 0 && this.state !== 'pending'){
-    var promise = this.handlerGroups.shift();
-      if (this.state === 'resolved')
-        this.newest(promise);
-      else
-        this.nError(promise);
+    var callbacks = this.handlerGroups.shift();
+      if (this.state === 'resolved') {
+        this.newest(callbacks);
+        //if(callback.forwarder) callback.forwarder.$promise.resolve(this.value);
+      }
+      else {
+        this.nError(callbacks);
+        //if(callback.forwarder) callback.forwarder.$promise.reject(this.value);
+      }
   }
 }
 
-$Promise.prototype.newest = function(promise){
-  if ((this.state === 'resolved') && (typeof promise.successCb === 'function'))
-    promise.successCb(this.value);
-  // console.log(this.value);
+$Promise.prototype.newest = function(callbacks){
+  if (this.state === 'resolved') {
+      if (typeof callbacks.successCb === 'function')
+        callbacks.successCb(this.value);
+      callbacks.forwarder.resolve(this.value);
+  }
 }
 
 $Promise.prototype.nError = function(promise){
@@ -83,7 +83,7 @@ $Promise.prototype.nError = function(promise){
 }
 
 $Promise.prototype.catch = function(func){
-  this.then(null, func);
+  return this.then(null, func);
 }
 
 
